@@ -154,3 +154,15 @@ smee --url https://smee.io/<your-channel-id> --target http://127.0.0.1:8000/webh
 - **Content type:** `application/json`
 - **Secret:** matches `WEBHOOK_SECRET` from `.env`
 - **Events to trigger:** Pull requests, Issue comments
+
+## 🌐 Live Deployment & Interactive Demo
+
+The review agent is continuously deployed on Render, and connected to an active public test repository:
+
+* **Live Cloud Service:** `https://gh-pr-agent.onrender.com`
+* **Interactive Test Repository:** [github.com/Ananth-Sai/gh-pr-bot-test](https://github.com/Ananth-Sai/gh-pr-bot-test)
+
+### Try It Live:
+1. Fork or open a PR with code changes against [gh-pr-bot-test](https://github.com/Ananth-Sai/gh-pr-bot-test).
+2. The bot will automatically scan for secrets, post inline review comments, and generate a remediation PR if issues exist.
+3. Leave a comment tagging `@pr-bot` (e.g., `@pr-bot write pytest unit tests for this file`) to test interactive ChatOps.
