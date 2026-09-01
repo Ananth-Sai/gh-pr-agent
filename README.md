@@ -1,168 +1,121 @@
-# 🤖 Autonomous AI PR Review & ChatOps Agent
+<div align="center">
 
-An event-driven, production-hardened GitHub assistant built with FastAPI, Google Gemini, and Docker. It autonomously audits pull requests, flags vulnerabilities with sticky inline diff comments, generates one-click remediation pull requests, and responds interactively to developer commands directly within PR discussions.
+# 🤖 GitHub PR Review & Auto-Fix Agent
 
----
+[![Python](https://img.shields.io/badge/Python-FastAPI-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![Gemini API](https://img.shields.io/badge/Google-Gemini%203.x-4285F4?style=for-the-badge&logo=googlegemini&logoColor=white)](https://ai.google.dev/)
+[![Redis](https://img.shields.io/badge/Redis-Queue%20(w%2F%20fallback)-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
+[![Tests Passing](https://img.shields.io/badge/Pytest-15%2F15%20Passing-44A833?style=for-the-badge&logo=pytest)](#testing)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](./Dockerfile)
+[![License](https://img.shields.io/badge/License-MIT-9945FF?style=for-the-badge)](./LICENSE)
 
-## 🌟 Key Features
+<p align="center">
+  An autonomous agent that reviews real pull requests, catches real bugs, and opens real fix PRs —<br/>
+  a genuine tool-calling agent loop, not a chatbot wrapper.
+</p>
 
-- **🛡️ Multi-Layer Security Engine:**
-  - **Local Pre-Flight Secret Scanner:** Zero-latency regex entropy detection for exposed AWS, OpenAI, and GitHub tokens before making external LLM calls.
-  - **Prompt Injection Boundary Isolation:** Encloses untrusted PR titles, diffs, and comments inside strict XML boundaries (`<untrusted_diff>`) to neutralize malicious system override attempts.
-  - **HMAC SHA-256 Webhook Verification:** Verifies GitHub webhook authenticity to prevent payload tampering and unauthorized triggers.
-
-- **⚡ Automated Code Review & Sticky Line Validation:**
-  - Analyzes unified diff hunks and maps suggestions strictly to valid additions (`RIGHT` side line offsets) to prevent GitHub `422 Unprocessable Entity` API rejections.
-  - Emits GitHub-native Markdown suggestions (` ```suggestion``` `) enabling single-click merges.
-
-- **🛠️ Autonomous Remediation Engine:**
-  - Automatically creates fix branches (`ai-fix/pr-{id}`) and opens companion remediation pull requests when critical bugs or vulnerabilities are detected.
-
-- **💬 PR ChatOps Assistant:**
-  - Intercepts developer commands tagged with `@pr-bot` directly on PR threads to generate unit tests, explain complexity, or suggest alternative implementations.
-
-- **🚀 Resilient Production Architecture:**
-  - **Non-Blocking Execution:** Offloads slow LLM and GitHub API operations to asynchronous background tasks, returning instant `200 OK` responses to GitHub.
-  - **Dual-Mode Queue:** Enqueues jobs to Redis Queue (`rq`) in production with graceful fallback to in-memory `BackgroundTasks` for local development.
-  - **Exponential Backoff:** Built-in retry engine with jitter for handling transient upstream network blips and API rate limits.
-  - **Rate Limit Monitoring:** Tracks `X-RateLimit-Remaining` on all GitHub REST operations to prevent service halts.
+</div>
 
 ---
 
-## 🏗️ Architecture & Request Lifecycle
+## See it actually working
 
-```text
-GitHub Webhook (PR Open / Comment)
-           │
-           ▼
-FastAPI App (`routers/webhook.py`)
-           │── 1. HMAC SHA-256 Signature Check
-           │── 2. Fast 200 OK Acknowledgment
-           │
-           ▼
-Task Dispatcher (`services/queue.py`) ──► [Redis / In-Memory Queue]
-           │
-    ┌──────┴──────────────────────────────────────────────┐
-    │                                                      │
-[PR Review Flow]                                    [ChatOps Flow]
-    │                                                      │
-    ├─► `services/security.py` (Local Secret Scan)         ├─► `services/diff_cleaner.py`
-    ├─► `services/diff_cleaner.py` (Noise & Line Filter)    └─► `services/gemini_chatops.py`
-    ├─► `services/gemini_reviewer.py` (Audit Engine)               │
-    ├─► `services/github_client.py` (Post Review)                  └─► `services/github_client.py`
-    └─► `services/gemini_patcher.py` (Auto-Fix PR)                     (Post PR Comment)
+This isn't a demo video — these are live, real PRs on a real repository:
+
+- **[PR #6](https://github.com/Ananth-Sai/gh-pr-bot-test/pull/6)** — the agent caught a hardcoded API key, a SQL injection via f-string, and a division-by-zero bug, each with the correct file, correct line, and a real GitHub-native suggested fix.
+- **[PR #7](https://github.com/Ananth-Sai/gh-pr-bot-test/pull/7)** — the agent's autonomous remediation engine opened this as a linked fix PR for the issues found in PR #6, without a human writing the patch.
+- The agent also responds to `@pr-bot` ChatOps commands directly in PR comments — e.g. `@pr-bot generate pytest unit tests for sample.py` returns a complete, working test suite.
+
+Self-hosted by design — point it at your own repo via a webhook rather than a shared public instance, so it always runs against your own GitHub token and review context.
+
+## How it works
+
+```
+[Developer Opens PR]
+         │
+         ▼ (Webhook)
+[FastAPI Server] ──► HMAC-SHA256 signature verification
+         │
+         ├─► Diff cleaning: strips lockfiles/binary assets, truncates oversized diffs
+         ├─► Local secret pre-flight scan (masked before it ever leaves the function)
+         ├─► Line-map extraction (keeps inline comments on valid diff lines only)
+         ├─► Gemini review inside an XML-isolated <untrusted_diff> boundary
+         │
+         ▼
+[GitHub REST API]
+         │
+    ┌────┴────┐
+    ▼         ▼
+Inline    Auto-fix
+comments   patch PR
 ```
 
----
+## Real engineering details worth knowing
 
-## 📂 Project Structure
+- **Secrets are never actually exposed, even while being reported.** The pre-flight scanner detects GitHub PATs, AWS keys, OpenAI-style keys, Slack tokens, private key blocks, and generic password assignments — but masks every match (`ghp_****...abcd`) before it's logged or sent anywhere. A detected secret's real value never leaves the scanning function.
+- **Prompt injection isolation is real, not just a claim.** Diff content is passed to Gemini inside explicit `<untrusted_diff>` XML tags with instructions that anything inside is untrusted input — mitigating a diff that contains "ignore your instructions" style text embedded in a comment or string literal.
+- **Line-accurate inline comments.** GitHub's API rejects review comments on lines that aren't part of the diff. This agent pre-computes the exact set of valid target lines per file from the diff hunks before posting, so comments don't silently fail against the API.
+- **Redis-backed queue with real fallback, not a fake one.** If a live Redis instance is reachable, jobs go through a persistent RQ queue with a standalone worker process. If not, it automatically drops to FastAPI's in-memory `BackgroundTasks` — the agent still works with zero extra infrastructure, just without job persistence across restarts.
 
-```text
-gh-pr-agent/
-├── config.py                  # Global settings, logging config & environment variables
-├── Dockerfile                 # Multi-stage production container
-├── main.py                    # Application entrypoint & router mounting
-├── requirements.txt           # Pinned dependencies
-├── routers/
-│   └── webhook.py             # Webhook route handlers & event routing
-├── schemas/
-│   ├── patch.py               # Pydantic data schemas for patches
-│   └── review.py              # Pydantic data schemas for review comments
-├── services/
-│   ├── diff_cleaner.py        # Noise filtering, lockfile stripper & hunk parser
-│   ├── gemini_chatops.py      # Gemini ChatOps interaction logic
-│   ├── gemini_patcher.py      # Automated patch generation logic
-│   ├── gemini_reviewer.py     # AI code auditor engine
-│   ├── github_client.py       # GitHub REST API client with rate-limit tracking
-│   ├── queue.py               # Dual-mode persistent task queue dispatcher
-│   ├── retry.py               # Exponential backoff decorator with jitter
-│   └── security.py            # Local credential and secret scanner
-└── tests/
-    ├── test_diff_cleaner.py   # Unit tests for diff filtering
-    ├── test_queue.py          # Unit tests for queue fallbacks
-    ├── test_retry.py          # Unit tests for retry backoff
-    ├── test_security.py       # Unit tests for credential patterns
-    └── test_webhook.py        # Integration tests for HMAC verification & routes
-```
+## Testing
 
----
-
-## 🧪 Testing
-
-Run the automated test suite with pytest:
+15 tests, independently run and passing — covering diff cleaning (lockfile filtering, truncation), secret detection (GitHub PAT, AWS key, OpenAI key, and a clean-code negative case), retry/backoff behavior, queue fallback logic, and webhook signature validation (missing signature, invalid signature, and valid signature acceptance).
 
 ```bash
-python -m pytest -v
+pytest tests/ -v
 ```
 
----
+## Tech Stack
 
-## ⚙️ Setup & Running Locally
+- **Backend:** Python, FastAPI
+- **AI:** Google Gemini API (`gemini-3.5-flash` / `gemini-3.5-flash-lite` / `gemini-3.6-flash`, with fallback across all three)
+- **Queue:** Redis + RQ, with automatic in-memory fallback
+- **Testing:** Pytest
+- **Deployment:** Docker
 
-### 1. Local environment setup
+## Self-Hosting Setup
 
+### 1. Clone and install
 ```bash
-# Clone the repository
-git clone https://github.com/Ananth-Sai/gh-pr-bot-test.git
+git clone https://github.com/Ananth-Sai/gh-pr-agent.git
 cd gh-pr-agent
-
-# Create and activate virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows: .\venv\Scripts\Activate.ps1
-
-# Install dependencies
+source venv/bin/activate  # or .\venv\Scripts\Activate.ps1 on Windows
 pip install -r requirements.txt
 ```
 
-### 2. Environment configuration
+### 2. Environment variables
 
-Create a `.env` file in the root directory:
-
-```env
-GEMINI_API_KEY=your_gemini_api_key
+Copy `.env.example` to `.env`:
+```
 GITHUB_TOKEN=your_github_personal_access_token
-WEBHOOK_SECRET=your_webhook_secret_string
-REDIS_URL=redis://localhost:6379/0  # Optional (falls back to in-memory mode)
+WEBHOOK_SECRET=choose_a_random_secret_string
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
-### 3. Start application
-
-**Option A: Local server**
+### 3. Run locally with a tunnel
 
 ```bash
-uvicorn main:app --reload --port 8000
+uvicorn main:app --reload
 ```
 
-**Option B: Docker container**
+Use `smee.io` or `ngrok` to tunnel your local server, then configure the webhook (with your `WEBHOOK_SECRET`) on the target repo's GitHub settings, pointed at `/webhook`.
+
+### 4. (Optional) Run the persistent worker
+
+If you have Redis running locally, start the standalone worker for persistent job queueing:
+```bash
+python worker.py
+```
+Without Redis, the agent still works — it just falls back to in-memory task handling automatically.
+
+### 5. Or deploy with Docker
 
 ```bash
 docker build -t gh-pr-agent .
 docker run -p 8000:8000 --env-file .env gh-pr-agent
 ```
 
-### 4. Configure webhook & forwarding
+## License
 
-Forward payloads locally via Smee.io:
-
-```bash
-smee --url https://smee.io/<your-channel-id> --target http://127.0.0.1:8000/webhook
-```
-
-**GitHub repository webhook settings** (`Settings > Webhooks > Add webhook`):
-
-- **Payload URL:** `https://smee.io/<your-channel-id>` (or your production URL `/webhook`)
-- **Content type:** `application/json`
-- **Secret:** matches `WEBHOOK_SECRET` from `.env`
-- **Events to trigger:** Pull requests, Issue comments
-
-## 🌐 Live Deployment & Interactive Demo
-
-The review agent is continuously deployed on Render, and connected to an active public test repository:
-
-* **Live Cloud Service:** `https://gh-pr-agent.onrender.com`
-* **Interactive Test Repository:** [github.com/Ananth-Sai/gh-pr-bot-test](https://github.com/Ananth-Sai/gh-pr-bot-test)
-
-### Try It Live:
-1. Fork or open a PR with code changes against [gh-pr-bot-test](https://github.com/Ananth-Sai/gh-pr-bot-test).
-2. The bot will automatically scan for secrets, post inline review comments, and generate a remediation PR if issues exist.
-3. Leave a comment tagging `@pr-bot` (e.g., `@pr-bot write pytest unit tests for this file`) to test interactive ChatOps.
+MIT
