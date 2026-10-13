@@ -2,12 +2,12 @@
 
 # 🤖 GitHub PR Review & Auto-Fix Agent
 
-[![Python](https://img.shields.io/badge/Python-FastAPI-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![Gemini API](https://img.shields.io/badge/Google-Gemini%203.x-4285F4?style=for-the-badge&logo=googlegemini&logoColor=white)](https://ai.google.dev/)
-[![Redis](https://img.shields.io/badge/Redis-Queue%20(w%2F%20fallback)-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
-[![Tests Passing](https://img.shields.io/badge/Pytest-15%2F15%20Passing-44A833?style=for-the-badge&logo=pytest)](#testing)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](./Dockerfile)
-[![License](https://img.shields.io/badge/License-MIT-9945FF?style=for-the-badge)](./LICENSE)
+[![Python](https://img.shields.io/badge/Python-FastAPI-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Gemini API](https://img.shields.io/badge/Google%20Gemini-3.x-4285F4?logo=googlegemini&logoColor=white)](https://ai.google.dev/)
+[![Redis](https://img.shields.io/badge/Redis-Queue%20(fallback)-DC382D?logo=redis&logoColor=white)](https://redis.io/)
+[![Tests Passing](https://img.shields.io/badge/Pytest-15%2F15%20Passing-44A833?logo=pytest&logoColor=white)](#testing)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](./Dockerfile)
+[![License](https://img.shields.io/badge/License-MIT-10B981)](./LICENSE)
 
 <p align="center">
   An autonomous agent that reviews real pull requests, catches real bugs, and opens real fix PRs —<br/>
