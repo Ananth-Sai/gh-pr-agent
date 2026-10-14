@@ -8,6 +8,10 @@ from services.gemini_critics import (
     audit_quality,
     run_critics_in_parallel,
 )
+from services.gemini_synthesizer import (
+    synthesize_reviews,
+    deduplicate_and_prioritize_comments,
+)
 from services.github_client import (
     submit_formal_pr_review,
     post_issue_comment,
@@ -25,6 +29,8 @@ __all__ = [
     "audit_security",
     "audit_quality",
     "run_critics_in_parallel",
+    "synthesize_reviews",
+    "deduplicate_and_prioritize_comments",
     "submit_formal_pr_review",
     "post_issue_comment",
     "create_patch_branch_and_pr",
