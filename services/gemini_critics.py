@@ -2,7 +2,11 @@ import logging
 from google import genai
 from google.genai import types
 from config import GEMINI_API_KEY
-from schemas.critic import SecurityCriticReport, QualityCriticReport
+from schemas.critic import (
+    SecurityCriticReport,
+    QualityCriticReport,
+    CriticsEvaluation,
+)
 
 logger = logging.getLogger("gh-pr-agent.critics")
 
@@ -128,3 +132,30 @@ The Security Critic handles all security auditing. Focus 100% on logic correctne
             continue
 
     raise RuntimeError("All configured quality critic models failed to respond.")
+
+
+def run_critics_in_parallel(
+    pr_title: str,
+    diff_text: str,
+    client: genai.Client | None = None,
+    timeout: float = 60.0,
+) -> CriticsEvaluation:
+    """Dispatches Security Critic and Quality Critic simultaneously across worker threads.
+
+    Eliminates sequential round-trip latency by fanning out Gemini API evaluations in parallel.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    logger.info("Executing fan-out: dispatching Security Critic and Quality Critic concurrently...")
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_security = executor.submit(audit_security, pr_title, diff_text, client)
+        future_quality = executor.submit(audit_quality, pr_title, diff_text, client)
+
+        security_report = future_security.result(timeout=timeout)
+        quality_report = future_quality.result(timeout=timeout)
+
+    return CriticsEvaluation(
+        security_report=security_report,
+        quality_report=quality_report,
+    )
+

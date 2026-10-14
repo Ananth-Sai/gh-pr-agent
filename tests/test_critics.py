@@ -88,3 +88,38 @@ def test_critic_all_models_fail():
 
     with pytest.raises(RuntimeError, match="All configured security critic models failed"):
         audit_security("title", "+diff", client=mock_client)
+
+
+def test_run_critics_in_parallel(monkeypatch):
+    import time
+    from services.gemini_critics import run_critics_in_parallel
+    from schemas.critic import CriticsEvaluation
+
+    def mock_audit_security(title, diff, client=None):
+        time.sleep(0.1)
+        return SecurityCriticReport(
+            summary="Security clear",
+            has_blocking_vulnerabilities=False,
+            findings=[],
+        )
+
+    def mock_audit_quality(title, diff, client=None):
+        time.sleep(0.1)
+        return QualityCriticReport(
+            summary="Clean structure",
+            findings=[],
+        )
+
+    monkeypatch.setattr("services.gemini_critics.audit_security", mock_audit_security)
+    monkeypatch.setattr("services.gemini_critics.audit_quality", mock_audit_quality)
+
+    start_time = time.perf_counter()
+    result = run_critics_in_parallel("test pr", "+diff content")
+    elapsed = time.perf_counter() - start_time
+
+    assert isinstance(result, CriticsEvaluation)
+    assert result.security_report.summary == "Security clear"
+    assert result.quality_report.summary == "Clean structure"
+    # Both slept 0.1s; in parallel, total duration should be well under 0.2s
+    assert elapsed < 0.19, f"Parallel execution took too long: {elapsed:.2f}s"
+

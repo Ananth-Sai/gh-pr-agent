@@ -5,6 +5,7 @@ from schemas.critic import (
     SecurityCriticReport,
     QualityFinding,
     QualityCriticReport,
+    CriticsEvaluation,
 )
 
 __all__ = [
@@ -16,5 +17,6 @@ __all__ = [
     "SecurityCriticReport",
     "QualityFinding",
     "QualityCriticReport",
+    "CriticsEvaluation",
 ]
 

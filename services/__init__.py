@@ -3,7 +3,11 @@ from services.diff_cleaner import clean_and_truncate_diff, get_valid_diff_lines_
 from services.gemini_reviewer import review_pr_diff
 from services.gemini_patcher import generate_patch
 from services.gemini_chatops import answer_pr_command
-from services.gemini_critics import audit_security, audit_quality
+from services.gemini_critics import (
+    audit_security,
+    audit_quality,
+    run_critics_in_parallel,
+)
 from services.github_client import (
     submit_formal_pr_review,
     post_issue_comment,
@@ -20,6 +24,7 @@ __all__ = [
     "answer_pr_command",
     "audit_security",
     "audit_quality",
+    "run_critics_in_parallel",
     "submit_formal_pr_review",
     "post_issue_comment",
     "create_patch_branch_and_pr",

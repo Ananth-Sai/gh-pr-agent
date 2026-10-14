@@ -58,3 +58,13 @@ class QualityCriticReport(BaseModel):
         default_factory=list,
         description="List of specific code quality, logic, or stylistic observations",
     )
+
+
+class CriticsEvaluation(BaseModel):
+    security_report: SecurityCriticReport = Field(
+        description="Output from the specialized Security Critic"
+    )
+    quality_report: QualityCriticReport = Field(
+        description="Output from the specialized Quality Critic"
+    )
+
