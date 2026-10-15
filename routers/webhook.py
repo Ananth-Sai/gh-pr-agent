@@ -127,7 +127,21 @@ async def handle_github_webhook(
 ):
     body = await request.body()
     verify_signature(body, x_hub_signature_256)
-    payload = await request.json()
+
+    if x_github_event == "ping":
+        logger.info("Received GitHub ping event. Webhook verified successfully!")
+        return {"status": "ok", "message": "Pong! Webhook active."}
+
+    content_type = request.headers.get("content-type", "")
+    if "application/x-www-form-urlencoded" in content_type:
+        from urllib.parse import parse_qs
+        import json
+        form_data = parse_qs(body.decode("utf-8", errors="replace"))
+        raw_payload = form_data.get("payload", ["{}"])[0]
+        payload = json.loads(raw_payload)
+    else:
+        payload = await request.json()
+
 
     if x_github_event == "issue_comment":
         action = payload.get("action")

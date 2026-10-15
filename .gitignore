@@ -25,3 +25,6 @@ htmlcov/
 Thumbs.db
 .vscode/
 .idea/
+
+# Local Study & Reference Materials
+guides/
